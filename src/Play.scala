@@ -98,15 +98,53 @@ object Play {
 
     // or def concat(..)
     def flatten[A](l : MyList[MyList[A]]) : MyList[A] = {
-      foldRight(l, Nil:MyList[A])(append)
+      foldRight(l, Nil:MyList[A])((a,b) => append(a,b))
     }
 
     def map[A,B](l: MyList[A])(f: A => B): MyList[B] =
       foldRight(l, Nil:MyList[B]) ((h,t) => Cons(f(h),t))
 
+    // use foldRight
+    def filter[A](as: MyList[A])(f: A => Boolean): MyList[A] =
+      foldRight(as, Nil:MyList[A]) ((h,t) => if f(h) then Cons(h,t) else t)
+
+
     def flatMap[A,B](l: MyList[A])(f: A => MyList[B]): MyList[B] =
       flatten(map(l)(f))
 
+    // useflatMap
+    def filterWithFlatMap[A](as: MyList[A])(f: A => Boolean): MyList[A] =
+      flatMap(as)((h) => if f(h) then MyList(h) else Nil)
+
+    ////////////////////////// MONADS ////////////////////////
+    trait Functor[F[_]]:
+      extension [A](fa: F[A])
+        def map[B](f: A => B): F[B]
+
+      extension [A, B](fab: F[(A, B)]) def distribute: (F[A], F[B]) =
+      (fab.map(_(0)), fab.map(_(1)))
+
+      extension [A, B](e: Either[F[A], F[B]]) def codistribute: F[Either[A, B]] =
+        e match
+          case Left(fa) => fa.map(Left(_))
+          case Right(fb) => fb.map(Right(_))
+
+    object Functor:
+      given listFunctor: Functor[List] with
+        extension [A](as: List[A])
+          def map[B](f: A => B): List[B] = as.map(f)
+
+    trait Monad[F[_]] extends Functor[F]:
+      def unit[A](a: => A): F[A]
+
+      extension [A](fa: F[A])
+        def flatMap[B](f: A => F[B]): F[B] =
+          fa.map(f).join
+
+      def compose[A,B,C](f: A => F[B], g: B => F[C]): A => F[C] = {a => f(a).flatMap(g)}
+
+      extension [A](ffa: F[F[A]]) def join: F[A] =
+        ffa.flatMap(identity)
 
   } // end MyList object
 
@@ -166,6 +204,10 @@ object Play {
 
         val listOfList = MyList(left,right)
         println("flatten " + listOfList + " to " + MyList.flatten(listOfList))
+
+        println("add using map: " + MyList.map(right)((a)=>a+1))
+        println("filter using foldRight: " + MyList.filter(right)((a)=>a%2==0))
+        println("filter using flatMap: " + MyList.filterWithFlatMap(right)((a)=>a%2==0))
 
       }
 // (100-8) = 92 - 3 = 89 - 1 = 88
