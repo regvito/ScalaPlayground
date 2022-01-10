@@ -1,4 +1,4 @@
-import Play.MyList.sum
+import Play.MyList.{sum, sumLists, zipWith}
 
 object Play {
 
@@ -79,6 +79,7 @@ object Play {
 
     // foldRight: process each element starting with last element first
     // List(1, 3, 8).foldRight(100)(_ - _) == 1 - (3 - (8 - 100)) == -94
+    // NOTES: - once you reach Nil of input list, return the accumulator
     def foldRight[A,B](as: MyList[A], z: B)(f: (A, B) => B): B = as match {
       case Nil => z
       case Cons(h, t) => f(h, foldRight(t, z)(f))
@@ -98,7 +99,7 @@ object Play {
 
     // or def concat(..)
     def flatten[A](l : MyList[MyList[A]]) : MyList[A] = {
-      foldRight(l, Nil:MyList[A])((a,b) => append(a,b))
+      foldRight(l, Nil:MyList[A])((a,b) => append(a,b)) // use append to connect each list within l together
     }
 
     def map[A,B](l: MyList[A])(f: A => B): MyList[B] =
@@ -110,41 +111,23 @@ object Play {
 
 
     def flatMap[A,B](l: MyList[A])(f: A => MyList[B]): MyList[B] =
-      flatten(map(l)(f))
+      flatten(map(l)(f)) // map will create a list of lists which flatten will combine into 1 list
 
     // useflatMap
     def filterWithFlatMap[A](as: MyList[A])(f: A => Boolean): MyList[A] =
       flatMap(as)((h) => if f(h) then MyList(h) else Nil)
 
-    ////////////////////////// MONADS ////////////////////////
-    trait Functor[F[_]]:
-      extension [A](fa: F[A])
-        def map[B](f: A => B): F[B]
+    def sumLists(a :MyList[Int], b: MyList[Int]) : MyList[Int] = (a,b) match {
+      case (Nil, _) => Nil
+      case (_, Nil) => Nil
+      case (Cons(h1,t1), Cons(h2,t2)) => Cons(h1+h2, sumLists(t1,t2))
+    }
 
-      extension [A, B](fab: F[(A, B)]) def distribute: (F[A], F[B]) =
-      (fab.map(_(0)), fab.map(_(1)))
-
-      extension [A, B](e: Either[F[A], F[B]]) def codistribute: F[Either[A, B]] =
-        e match
-          case Left(fa) => fa.map(Left(_))
-          case Right(fb) => fb.map(Right(_))
-
-    object Functor:
-      given listFunctor: Functor[List] with
-        extension [A](as: List[A])
-          def map[B](f: A => B): List[B] = as.map(f)
-
-    trait Monad[F[_]] extends Functor[F]:
-      def unit[A](a: => A): F[A]
-
-      extension [A](fa: F[A])
-        def flatMap[B](f: A => F[B]): F[B] =
-          fa.map(f).join
-
-      def compose[A,B,C](f: A => F[B], g: B => F[C]): A => F[C] = {a => f(a).flatMap(g)}
-
-      extension [A](ffa: F[F[A]]) def join: F[A] =
-        ffa.flatMap(identity)
+    def zipWith[A,B,C](a :MyList[A], b: MyList[B], f : (A,B) => C) : MyList[C] = (a,b) match {
+      case (Nil, _) => Nil
+      case (_, Nil) => Nil
+      case (Cons(h1,t1), Cons(h2,t2)) => Cons(f(h1,h2), zipWith(t1,t2,f))
+    }
 
   } // end MyList object
 
@@ -208,6 +191,12 @@ object Play {
         println("add using map: " + MyList.map(right)((a)=>a+1))
         println("filter using foldRight: " + MyList.filter(right)((a)=>a%2==0))
         println("filter using flatMap: " + MyList.filterWithFlatMap(right)((a)=>a%2==0))
+
+        println("sum of lists = " + sumLists(left, right))
+        println("sum of lists = " + sumLists(MyList(1), MyList(1,2,3)))
+        println("sum of lists with zipWith = " + zipWith(MyList(1,2), MyList(1,2,3), (a,b) => a+b))
+        println("concat of lists with zipWith = " + zipWith(MyList("reg","vito"), MyList("first","last","what"),
+          (a,b) => a+"::" + b))
 
       }
 // (100-8) = 92 - 3 = 89 - 1 = 88
